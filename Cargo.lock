@@ -202,7 +202,7 @@ checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 [[package]]
 name = "candle-core"
 version = "0.9.2-alpha.1"
-source = "git+https://github.com/huggingface/candle.git#d23664fb4f50e709f2544fbed99d071a18a963eb"
+source = "git+https://github.com/huggingface/candle.git?rev=d23664fb4f50e709f2544fbed99d071a18a963eb#d23664fb4f50e709f2544fbed99d071a18a963eb"
 dependencies = [
  "byteorder",
  "candle-kernels",
@@ -232,7 +232,7 @@ dependencies = [
 [[package]]
 name = "candle-kernels"
 version = "0.9.2-alpha.1"
-source = "git+https://github.com/huggingface/candle.git#d23664fb4f50e709f2544fbed99d071a18a963eb"
+source = "git+https://github.com/huggingface/candle.git?rev=d23664fb4f50e709f2544fbed99d071a18a963eb#d23664fb4f50e709f2544fbed99d071a18a963eb"
 dependencies = [
  "bindgen_cuda",
 ]
@@ -240,7 +240,7 @@ dependencies = [
 [[package]]
 name = "candle-metal-kernels"
 version = "0.9.2-alpha.1"
-source = "git+https://github.com/huggingface/candle.git#d23664fb4f50e709f2544fbed99d071a18a963eb"
+source = "git+https://github.com/huggingface/candle.git?rev=d23664fb4f50e709f2544fbed99d071a18a963eb#d23664fb4f50e709f2544fbed99d071a18a963eb"
 dependencies = [
  "half",
  "objc2",
@@ -254,7 +254,7 @@ dependencies = [
 [[package]]
 name = "candle-nn"
 version = "0.9.2-alpha.1"
-source = "git+https://github.com/huggingface/candle.git#d23664fb4f50e709f2544fbed99d071a18a963eb"
+source = "git+https://github.com/huggingface/candle.git?rev=d23664fb4f50e709f2544fbed99d071a18a963eb#d23664fb4f50e709f2544fbed99d071a18a963eb"
 dependencies = [
  "candle-core",
  "candle-metal-kernels",
@@ -271,7 +271,7 @@ dependencies = [
 [[package]]
 name = "candle-transformers"
 version = "0.9.2-alpha.1"
-source = "git+https://github.com/huggingface/candle.git#d23664fb4f50e709f2544fbed99d071a18a963eb"
+source = "git+https://github.com/huggingface/candle.git?rev=d23664fb4f50e709f2544fbed99d071a18a963eb#d23664fb4f50e709f2544fbed99d071a18a963eb"
 dependencies = [
  "byteorder",
  "candle-core",
@@ -2053,7 +2053,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
