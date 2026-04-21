@@ -1,0 +1,43 @@
+[package]
+name = "sd-minimal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+candle-core = { git = "https://github.com/huggingface/candle.git", package = "candle-core" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", package = "candle-nn" }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", package = "candle-transformers" }
+
+clap = { version = "4.4", features = ["derive"] }
+
+tokenizers = "0.21"
+safetensors = "0.3"
+memmap2 = "0.9"
+num_cpus = "1.16"
+rayon = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+anyhow = "1.0"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+
+[[bin]]
+name = "flux_gpu"
+path = "src/flux_stream.rs"
+
+[[bin]]
+name = "flux_cpu"
+path = "src/flux_cpu.rs"
+
+[[bin]]
+name = "vae_decode"
+path = "src/vae_decode.rs"
+
+[[bin]]
+name = "text_encoder"
+path = "src/text_encoder.rs"
+
+[features]
+cuda  = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+cudnn = ["candle-core/cudnn", "candle-nn/cudnn"]
+metal = ["candle-core/metal", "candle-nn/metal"]
