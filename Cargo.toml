@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-core" }
-candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-nn" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-transformers" }
+candle-core = { version = "0.10.2", package = "candle-core" }
+candle-nn = { version = "0.10.2", package = "candle-nn" }
+candle-transformers = { version = "0.10.2", package = "candle-transformers" }
 
 clap = { version = "4.4", features = ["derive"] }
 

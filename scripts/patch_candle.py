@@ -9,16 +9,18 @@ the original private signature is still present).
 Usage:
     python3 scripts/patch_candle.py
 """
-import glob, sys
+import glob, pathlib, sys
 
-CANDLE_REV = "d23664f"
+CANDLE_VERSION = "0.10.2"
 
-matches = glob.glob(
-    f"/root/.cargo/git/checkouts/candle-*/{CANDLE_REV}"
-    f"/candle-transformers/src/models/flux/model.rs"
-)
+home = pathlib.Path.home()
+matches = glob.glob(str(
+    home / f".cargo/registry/src/index.crates.io-*"
+           f"/candle-transformers-{CANDLE_VERSION}/src/models/flux/model.rs"
+))
 if not matches:
-    print(f"ERROR: candle model.rs not found for rev {CANDLE_REV}", file=sys.stderr)
+    print(f"ERROR: candle-transformers-{CANDLE_VERSION} model.rs not found in registry", file=sys.stderr)
+    print(f"  Run `cargo fetch` first to download dependencies.", file=sys.stderr)
     sys.exit(1)
 
 path = matches[0]
