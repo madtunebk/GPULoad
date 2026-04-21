@@ -1,4 +1,4 @@
-# Build StreamForge Rust binaries for Kaggle T4 (sm_70)
+# Build StreamForge Rust binaries for Kaggle T4 (sm_75, Turing)
 #
 # Base: Ubuntu 20.04 + CUDA 12.2 devel
 #   - glibc 2.31 → binaries run on any Ubuntu 20.04+ system (including Kaggle)
@@ -32,8 +32,8 @@ RUN cargo fetch --locked
 COPY scripts/patch_candle.py scripts/patch_candle.py
 RUN python3 scripts/patch_candle.py
 
-# Build release binaries targeting Kaggle T4 (Volta/Turing sm_70)
-ENV CUDA_COMPUTE_CAP=70
+# Build release binaries targeting Kaggle T4 (Turing sm_75)
+ENV CUDA_COMPUTE_CAP=75
 ENV CUDA_PATH=/usr/local/cuda
 ENV CUDA_ROOT=/usr/local/cuda
 
