@@ -36,7 +36,15 @@ src = open(path).read()
 replacements = [
     # Fixup: undo incorrect pub on Flux::WithForward trait impl (left by old patch runs).
     # Trait items must NOT have visibility qualifiers (E0449).
-    # Identified by img_ids: &Tensor as the second positional tensor arg.
+    # The Flux trait impl is the ONLY fn forward in this file preceded by
+    # #[allow(clippy::too_many_arguments)] — DoubleStreamBlock::forward has no such attr.
+    (
+        '#[allow(clippy::too_many_arguments)]\n'
+        '    pub fn forward(',
+        '#[allow(clippy::too_many_arguments)]\n'
+        '    fn forward(',
+    ),
+    # Secondary fixup via img_ids pattern (catches other bad-patch variants).
     (
         '    pub fn forward(\n'
         '        &self,\n'
