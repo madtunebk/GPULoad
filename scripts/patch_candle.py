@@ -34,6 +34,19 @@ src = open(path).read()
 #   fn forward(&self, img: &Tensor, txt: &Tensor, ...)      ← second arg is txt
 # We include the second arg to distinguish them.
 replacements = [
+    # Fixup: undo incorrect pub on Flux::WithForward trait impl (left by old patch runs).
+    # Trait items must NOT have visibility qualifiers (E0449).
+    # Identified by img_ids: &Tensor as the second positional tensor arg.
+    (
+        '    pub fn forward(\n'
+        '        &self,\n'
+        '        img: &Tensor,\n'
+        '        img_ids: &Tensor,',
+        '    fn forward(\n'
+        '        &self,\n'
+        '        img: &Tensor,\n'
+        '        img_ids: &Tensor,',
+    ),
     # timestep_embedding: free function, pub(crate) in original commit
     (
         'pub(crate) fn timestep_embedding',
