@@ -22,32 +22,32 @@ use tokenizers::Tokenizer;
 // ---------------------------------------------------------------------------
 // Paths (all point into the HF cache or local models/)
 // ---------------------------------------------------------------------------
-const CLIP_WEIGHTS: &str = concat!(
-    env!("HOME"),
-    "/.cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev",
-    "/snapshots/3de623fc3c33e44ffbe2bad470d0f45bccf2eb21",
-    "/text_encoder/model.safetensors"
-);
 const CLIP_TOKENIZER: &str = "models/tokenizer/tokenizer.json";
+const HF_REPO_DIR: &str =
+    ".cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev";
 
-const T5_SHARD1: &str = concat!(
-    env!("HOME"),
-    "/.cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev",
-    "/snapshots/3de623fc3c33e44ffbe2bad470d0f45bccf2eb21",
-    "/text_encoder_2/model-00001-of-00002.safetensors"
-);
-const T5_SHARD2: &str = concat!(
-    env!("HOME"),
-    "/.cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev",
-    "/snapshots/3de623fc3c33e44ffbe2bad470d0f45bccf2eb21",
-    "/text_encoder_2/model-00002-of-00002.safetensors"
-);
-const T5_TOKENIZER: &str = concat!(
-    env!("HOME"),
-    "/.cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev",
-    "/snapshots/3de623fc3c33e44ffbe2bad470d0f45bccf2eb21",
-    "/tokenizer_2/tokenizer.json"
-);
+/// Resolve a path inside the HF snapshot for FLUX.1-dev.
+/// Looks for any snapshot dir under $HOME/.cache/huggingface/hub/…/snapshots/
+/// and returns the first one that contains `rel_path`.
+fn hf_path(rel_path: &str) -> Result<std::path::PathBuf> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    let snaps_dir = std::path::PathBuf::from(&home)
+        .join(HF_REPO_DIR)
+        .join("snapshots");
+    let entries = std::fs::read_dir(&snaps_dir)
+        .with_context(|| format!("read_dir {}", snaps_dir.display()))?;
+    for entry in entries.flatten() {
+        let candidate = entry.path().join(rel_path);
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    anyhow::bail!(
+        "Could not find '{}' in any snapshot under {}",
+        rel_path,
+        snaps_dir.display()
+    )
+}
 
 const CLIP_MAX_LEN: usize = 77;
 const T5_MAX_LEN: usize = 512;
@@ -133,7 +133,8 @@ fn encode_clip(prompt: &str, device: &Device, dtype: DType, lora_path: Option<&s
 
     println!("  Loading CLIP weights (mmap)...");
     let t0 = Instant::now();
-    let (_f, mmap) = mmap_file(CLIP_WEIGHTS)?;
+    let clip_weights = hf_path("text_encoder/model.safetensors")?;
+    let (_f, mmap) = mmap_file(clip_weights.to_str().unwrap())?;
     let st = SafeTensors::deserialize(&mmap[..]).context("CLIP safetensors")?;
 
     // Build tensors map — only 246 MB, fine to load eagerly
@@ -175,7 +176,8 @@ fn encode_clip(prompt: &str, device: &Device, dtype: DType, lora_path: Option<&s
 // ---------------------------------------------------------------------------
 fn encode_t5(prompt: &str, device: &Device, dtype: DType) -> Result<Tensor> {
     println!("  Loading T5 tokenizer...");
-    let tokenizer = Tokenizer::from_file(T5_TOKENIZER)
+    let t5_tok_path = hf_path("tokenizer_2/tokenizer.json")?;
+    let tokenizer = Tokenizer::from_file(&t5_tok_path)
         .map_err(|e| anyhow::anyhow!("T5 tokenizer: {e}"))?;
 
     // Tokenize. T5 tokenizer adds EOS (1) automatically; truncate to T5_MAX_LEN.
@@ -197,8 +199,10 @@ fn encode_t5(prompt: &str, device: &Device, dtype: DType) -> Result<Tensor> {
 
     println!("  Memory-mapping T5-XXL weights ({:.1} GB) from SSD...", 9.52);
     let t0 = Instant::now();
-    let (_f1, mmap1) = mmap_file(T5_SHARD1)?;
-    let (_f2, mmap2) = mmap_file(T5_SHARD2)?;
+    let t5_shard1 = hf_path("text_encoder_2/model-00001-of-00002.safetensors")?;
+    let t5_shard2 = hf_path("text_encoder_2/model-00002-of-00002.safetensors")?;
+    let (_f1, mmap1) = mmap_file(t5_shard1.to_str().unwrap())?;
+    let (_f2, mmap2) = mmap_file(t5_shard2.to_str().unwrap())?;
 
     // Build tensors map from both shards. T5-XXL is 9.52 GB — this triggers
     // OS paging as we touch each weight during forward pass.
