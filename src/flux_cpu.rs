@@ -3,6 +3,7 @@
 // If this gives clean output, the bug is in the GPU path.
 
 mod flux_blocks;
+mod path_config;
 
 use anyhow::Result;
 use candle_core::{DType, Device, IndexOp, Tensor};
@@ -50,7 +51,8 @@ fn main() -> Result<()> {
     println!("Memory-mapping transformer weights from SSD...");
     let t0 = Instant::now();
     let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(&["models/flux_candle.safetensors"], dtype, &cpu)?
+        let flux_path = path_config::model_path("flux_candle.safetensors");
+        VarBuilder::from_mmaped_safetensors(&[flux_path], dtype, &cpu)?
     };
     println!("  mmap ready in {:.1}s", t0.elapsed().as_secs_f32());
 

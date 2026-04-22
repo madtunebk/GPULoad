@@ -2,8 +2,10 @@
 // Loads all weights to CPU RAM, streams one block at a time to GPU.
 // Peak VRAM: ~4GB regardless of model size.
 
+mod device_config;
 mod flux_blocks;
 mod lora;
+mod path_config;
 use anyhow::Result;
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::{self as nn, LayerNorm, Module, VarBuilder};
@@ -150,8 +152,12 @@ fn seeded_randn(seed: u64, n: usize) -> Vec<f32> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let gpu = Device::cuda_if_available(0)?;
-    println!("Device: {:?}", gpu);
-    let dtype = if gpu.is_cuda() { DType::BF16 } else { DType::F32 };
+    let dtype = if gpu.is_cuda() {
+        device_config::auto_cuda_dtype(0)?
+    } else {
+        DType::F32
+    };
+    println!("Device: {:?}  dtype: {}", gpu, device_config::dtype_label(dtype));
     let cfg = flux::model::Config::dev();
     let h = cfg.hidden_size; // 3072
 
@@ -203,7 +209,7 @@ fn main() -> Result<()> {
     // --- Memory-map transformer weights (OS pages from SSD on demand) ---
     println!("Memory-mapping transformer weights from SSD...");
     let t0 = Instant::now();
-    let model_file = std::fs::File::open("models/flux_candle.safetensors")?;
+    let model_file = std::fs::File::open(path_config::model_path("flux_candle.safetensors"))?;
     let model_mmap = Arc::new(unsafe { MmapOptions::new().map(&model_file)? });
     let st = SafeTensors::deserialize(&model_mmap[..])?;
     println!("  mmap ready in {:.1}s", t0.elapsed().as_secs_f32());

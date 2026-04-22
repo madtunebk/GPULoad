@@ -8,6 +8,9 @@
 
 mod lora;
 
+mod device_config;
+mod path_config;
+
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{Module, VarBuilder};
@@ -19,21 +22,11 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tokenizers::Tokenizer;
 
-// ---------------------------------------------------------------------------
-// Paths (all point into the HF cache or local models/)
-// ---------------------------------------------------------------------------
-const CLIP_TOKENIZER: &str = "models/tokenizer/tokenizer.json";
-const HF_REPO_DIR: &str =
-    ".cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev";
-
 /// Resolve a path inside the HF snapshot for FLUX.1-dev.
 /// Looks for any snapshot dir under $HOME/.cache/huggingface/hub/…/snapshots/
 /// and returns the first one that contains `rel_path`.
 fn hf_path(rel_path: &str) -> Result<std::path::PathBuf> {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-    let snaps_dir = std::path::PathBuf::from(&home)
-        .join(HF_REPO_DIR)
-        .join("snapshots");
+    let snaps_dir = path_config::hf_repo_dir().join("snapshots");
     let entries = std::fs::read_dir(&snaps_dir)
         .with_context(|| format!("read_dir {}", snaps_dir.display()))?;
     for entry in entries.flatten() {
@@ -115,7 +108,7 @@ fn mmap_file(path: &str) -> Result<(std::fs::File, memmap2::Mmap)> {
 // ---------------------------------------------------------------------------
 fn encode_clip(prompt: &str, device: &Device, dtype: DType, lora_path: Option<&str>, lora_scale: f32) -> Result<Tensor> {
     println!("  Loading CLIP tokenizer...");
-    let tokenizer = Tokenizer::from_file(CLIP_TOKENIZER)
+    let tokenizer = Tokenizer::from_file(path_config::clip_tokenizer_path())
         .map_err(|e| anyhow::anyhow!("CLIP tokenizer: {e}"))?;
 
     // Tokenize; CLIP uses BPE, no special padding needed beyond truncation to 77.
@@ -264,8 +257,13 @@ fn main() -> Result<()> {
     // T5-XXL is 9.5 GB — always stays on CPU (no streaming impl; candle's T5Block is private).
     let (clip_device, clip_dtype) = match device_str.as_str() {
         "cuda" => {
-            println!("Device: CUDA  (CLIP on GPU, T5 on CPU)");
-            (Device::new_cuda(0)?, DType::BF16)
+            device_config::ensure_cuda_feature_enabled()?;
+            let dtype = device_config::auto_cuda_dtype(0)?;
+            println!(
+                "Device: CUDA  (CLIP on GPU, T5 on CPU)  dtype: {}",
+                device_config::dtype_label(dtype)
+            );
+            (Device::new_cuda(0)?, dtype)
         }
         _ => {
             println!("Device: CPU");
@@ -282,11 +280,13 @@ fn main() -> Result<()> {
     let t5_emb = encode_t5(&prompt, &Device::Cpu, DType::F32)
         .context("T5 encoding failed")?;
 
-    // Cast to BF16 before saving — matches Python output dtype and halves file size.
-    // flux_gpu loads these and calls .to_dtype(bf16) anyway, so F32→BF16 here is safe.
+    let save_dtype = if clip_device.is_cuda() { clip_dtype } else { DType::BF16 };
+
+    // Store embeddings in the active GPU dtype so pre-Ampere cards avoid BF16 casts.
+    // CPU mode still writes BF16 to keep file sizes small.
     let mut out: HashMap<String, Tensor> = HashMap::new();
-    out.insert("clip_emb".to_string(), clip_emb.to_dtype(DType::BF16)?);
-    out.insert("t5_emb".to_string(), t5_emb.to_dtype(DType::BF16)?);
+    out.insert("clip_emb".to_string(), clip_emb.to_dtype(save_dtype)?);
+    out.insert("t5_emb".to_string(), t5_emb.to_dtype(save_dtype)?);
 
     std::fs::create_dir_all("temp")?;
     candle_core::safetensors::save(&out, "temp/prompt_embeds.safetensors")?;

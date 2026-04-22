@@ -2,6 +2,8 @@
 // Input:  temp/latents.safetensors  (packed [1, patches, 64])
 // Output: temp/output_rust.png
 
+mod path_config;
+
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
@@ -173,7 +175,8 @@ fn main() -> Result<()> {
     println!("Loading VAE weights (mmap)...");
     let t0 = Instant::now();
     let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(&["models/vae_candle.safetensors"], DType::F32, &device)?
+        let vae_path = path_config::model_path("vae_candle.safetensors");
+        VarBuilder::from_mmaped_safetensors(&[vae_path], DType::F32, &device)?
     };
     let vae = AutoEncoderKL::new(vb, 3, 3, flux_vae_config())?;
     println!("  VAE ready in {:.1}s", t0.elapsed().as_secs_f32());
