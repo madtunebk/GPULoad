@@ -12,6 +12,8 @@
 
 # Agent instructions (local only)
 AGENTS.md
+prompt.txt
+kaggle_flux_streamforge.ipynb
 
 # LoRA weights (store separately)
 /loras/
