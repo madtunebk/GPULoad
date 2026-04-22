@@ -150,6 +150,27 @@ fn seeded_randn(seed: u64, n: usize) -> Vec<f32> {
     out
 }
 
+fn load_required_embedding<'a>(
+    emb: &'a HashMap<String, Tensor>,
+    key: &str,
+    file_path: &str,
+) -> anyhow::Result<&'a Tensor> {
+    emb.get(key).ok_or_else(|| {
+        let mut keys: Vec<&str> = emb.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        anyhow::anyhow!(
+            "Missing key '{}' in {}. Available keys: {}",
+            key,
+            file_path,
+            if keys.is_empty() {
+                "<none>".to_string()
+            } else {
+                keys.join(", ")
+            }
+        )
+    })
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     let gpu = Device::cuda_if_available(0)?;
@@ -165,8 +186,8 @@ fn main() -> Result<()> {
     // --- Load prompt embeddings ---
     let emb: HashMap<String, Tensor> =
         candle_core::safetensors::load(&args.embeddings, &gpu)?;
-    let t5_emb = emb["t5_emb"].to_dtype(dtype)?;
-    let clip_emb = emb["clip_emb"].to_dtype(dtype)?;
+    let t5_emb = load_required_embedding(&emb, "t5_emb", &args.embeddings)?.to_dtype(dtype)?;
+    let clip_emb = load_required_embedding(&emb, "clip_emb", &args.embeddings)?.to_dtype(dtype)?;
     println!("T5: {:?}  CLIP: {:?}", t5_emb.dims(), clip_emb.dims());
 
     // --- Initial latent noise ---

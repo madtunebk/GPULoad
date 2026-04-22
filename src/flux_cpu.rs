@@ -12,6 +12,26 @@ use candle_transformers::models::flux;
 use std::collections::HashMap;
 use std::time::Instant;
 
+fn load_required_embedding<'a>(
+    emb: &'a HashMap<String, Tensor>,
+    key: &str,
+    file_path: &str,
+) -> anyhow::Result<&'a Tensor> {
+    emb.get(key).ok_or_else(|| {
+        let mut keys: Vec<&str> = emb.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        anyhow::anyhow!(
+            "Missing key '{}' in {}. Available keys: {}",
+            key,
+            file_path,
+            if keys.is_empty() {
+                "<none>".to_string()
+            } else {
+                keys.join(", ")
+            }
+        )
+    })
+}
 
 fn main() -> Result<()> {
     let cpu = Device::Cpu;
@@ -26,10 +46,11 @@ fn main() -> Result<()> {
     let h = cfg.hidden_size; // 3072
 
     // --- Load prompt embeddings ---
+    let embeddings_path = "temp/prompt_embeds_from_flux_ref.safetensors";
     let emb: HashMap<String, Tensor> =
-        candle_core::safetensors::load("temp/prompt_embeds_from_flux_ref.safetensors", &cpu)?;
-    let t5_emb = emb["t5_emb"].to_dtype(dtype)?;
-    let clip_emb = emb["clip_emb"].to_dtype(dtype)?;
+        candle_core::safetensors::load(embeddings_path, &cpu)?;
+    let t5_emb = load_required_embedding(&emb, "t5_emb", embeddings_path)?.to_dtype(dtype)?;
+    let clip_emb = load_required_embedding(&emb, "clip_emb", embeddings_path)?.to_dtype(dtype)?;
     println!("T5: {:?}  CLIP: {:?}", t5_emb.dims(), clip_emb.dims());
 
     // --- Initial latent noise ---

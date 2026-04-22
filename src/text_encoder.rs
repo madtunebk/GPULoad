@@ -16,6 +16,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::{Module, VarBuilder};
 use candle_transformers::models::clip::text_model::{Activation as ClipActivation, ClipTextConfig, ClipTextTransformer};
 use candle_transformers::models::t5::{ActivationWithOptionalGating, Config as T5Config, T5EncoderModel};
+use clap::Parser;
 use memmap2::MmapOptions;
 use safetensors::SafeTensors;
 use std::collections::HashMap;
@@ -44,6 +45,27 @@ fn hf_path(rel_path: &str) -> Result<std::path::PathBuf> {
 
 const CLIP_MAX_LEN: usize = 77;
 const T5_MAX_LEN: usize = 512;
+
+#[derive(Parser)]
+#[command(name = "text_encoder")]
+#[command(about = "Encode a prompt with CLIP-L and T5-XXL into temp/prompt_embeds.safetensors")]
+struct Args {
+    /// Text prompt to encode.
+    #[arg(default_value = "A cat sitting on a bench")]
+    prompt: String,
+
+    /// Device for CLIP encoder. T5 always runs on CPU.
+    #[arg(long, default_value = "cpu")]
+    device: String,
+
+    /// Optional LoRA file to merge into CLIP weights.
+    #[arg(long)]
+    lora: Option<String>,
+
+    /// LoRA scale used when --lora is set.
+    #[arg(long, default_value_t = 1.0)]
+    lora_scale: f32,
+}
 
 // ---------------------------------------------------------------------------
 // CLIP-L config (openai/clip-vit-large-patch14)
@@ -234,28 +256,15 @@ fn encode_t5(prompt: &str, device: &Device, dtype: DType) -> Result<Tensor> {
 // main
 // ---------------------------------------------------------------------------
 fn main() -> Result<()> {
-    // Simple arg parsing: first positional = prompt, then --lora / --lora-scale
-    let mut args = std::env::args().skip(1);
-    let mut prompt = String::from("A cat sitting on a bench");
-    let mut lora_path: Option<String> = None;
-    let mut lora_scale: f32 = 1.0;
-    let mut device_str = String::from("cpu");
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--lora"       => { lora_path   = args.next(); }
-            "--lora-scale" => { lora_scale  = args.next().and_then(|s| s.parse().ok()).unwrap_or(1.0); }
-            "--device"     => { device_str  = args.next().unwrap_or_else(|| "cpu".to_string()); }
-            _              => { prompt = arg; }
-        }
-    }
-    println!("Prompt: {:?}", prompt);
-    if let Some(ref p) = lora_path {
-        println!("LoRA:   {p}  scale={lora_scale:.2}");
+    let args = Args::parse();
+    println!("Prompt: {:?}", args.prompt);
+    if let Some(ref p) = args.lora {
+        println!("LoRA:   {p}  scale={:.2}", args.lora_scale);
     }
 
     // CLIP is ~250 MB and runs on the requested device.
     // T5-XXL is 9.5 GB — always stays on CPU (no streaming impl; candle's T5Block is private).
-    let (clip_device, clip_dtype) = match device_str.as_str() {
+    let (clip_device, clip_dtype) = match args.device.as_str() {
         "cuda" => {
             device_config::ensure_cuda_feature_enabled()?;
             let dtype = device_config::auto_cuda_dtype(0)?;
@@ -272,12 +281,12 @@ fn main() -> Result<()> {
     };
 
     println!("\n=== CLIP-L ===");
-    let clip_emb = encode_clip(&prompt, &clip_device, clip_dtype, lora_path.as_deref(), lora_scale)
+    let clip_emb = encode_clip(&args.prompt, &clip_device, clip_dtype, args.lora.as_deref(), args.lora_scale)
         .context("CLIP encoding failed")?;
 
     println!("\n=== T5-XXL ===");
     // T5 always on CPU — candle's T5Block is private, no block-streaming impl available.
-    let t5_emb = encode_t5(&prompt, &Device::Cpu, DType::F32)
+    let t5_emb = encode_t5(&args.prompt, &Device::Cpu, DType::F32)
         .context("T5 encoding failed")?;
 
     let save_dtype = if clip_device.is_cuda() { clip_dtype } else { DType::BF16 };
