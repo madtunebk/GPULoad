@@ -42,6 +42,7 @@ struct Args {
     #[arg(long, default_value = "3.5")] guidance: f32,
     #[arg(long, default_value = "temp/prompt_embeds.safetensors")] embeddings: String,
     #[arg(long, default_value = "temp/latents.safetensors")]        out_latents: String,
+    #[arg(long)] model: Option<String>,
     /// Optional LoRA weights file (kohya safetensors format)
     #[arg(long)] lora: Option<String>,
     /// LoRA merge strength (default 1.0)
@@ -73,8 +74,8 @@ fn gpu_vb_from_st(
             };
             let shape: Vec<usize> = view.shape().to_vec();
             let t = Tensor::from_raw_buffer(view.data(), src_dtype, &shape, &Device::Cpu)?
-                .to_device(gpu)?
-                .to_dtype(dtype)?;
+                .to_dtype(dtype)?
+                .to_device(gpu)?;
             m.insert(short.to_string(), t);
         }
     }
@@ -115,7 +116,7 @@ fn cpu_to_gpu_map(
 ) -> anyhow::Result<HashMap<String, Tensor>> {
     let mut m = HashMap::new();
     for (k, v) in cpu_map {
-        m.insert(k, v.to_device(gpu)?.to_dtype(dtype)?);
+        m.insert(k, v.to_dtype(dtype)?.to_device(gpu)?);
     }
     Ok(m)
 }
@@ -209,7 +210,13 @@ fn main() -> Result<()> {
     // --- Memory-map transformer weights (OS pages from SSD on demand) ---
     println!("Memory-mapping transformer weights from SSD...");
     let t0 = Instant::now();
-    let model_file = std::fs::File::open(path_config::model_path("flux_candle.safetensors"))?;
+    let model_path = args
+        .model
+        .as_deref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| path_config::model_path("flux_candle.safetensors"));
+    println!("  model: {}", model_path.display());
+    let model_file = std::fs::File::open(&model_path)?;
     let model_mmap = Arc::new(unsafe { MmapOptions::new().map(&model_file)? });
     let st = SafeTensors::deserialize(&model_mmap[..])?;
     println!("  mmap ready in {:.1}s", t0.elapsed().as_secs_f32());

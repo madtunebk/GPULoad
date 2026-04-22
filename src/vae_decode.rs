@@ -30,6 +30,7 @@ struct Args {
     #[arg(long, default_value = "temp/latents.safetensors")] latents: String,
     #[arg(long, default_value = "temp/output_rust.png")]
     #[arg(alias = "output")] out: String,
+    #[arg(long)] model: Option<String>,
     /// If omitted, read from the latents file (saved by flux_gpu)
     #[arg(long)] width: Option<usize>,
     /// If omitted, read from the latents file (saved by flux_gpu)
@@ -174,8 +175,13 @@ fn main() -> Result<()> {
 
     println!("Loading VAE weights (mmap)...");
     let t0 = Instant::now();
+    let vae_path = args
+        .model
+        .as_deref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| path_config::model_path("vae_candle.safetensors"));
+    println!("  model: {}", vae_path.display());
     let vb = unsafe {
-        let vae_path = path_config::model_path("vae_candle.safetensors");
         VarBuilder::from_mmaped_safetensors(&[vae_path], DType::F32, &device)?
     };
     let vae = AutoEncoderKL::new(vb, 3, 3, flux_vae_config())?;
