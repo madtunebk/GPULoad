@@ -3,6 +3,7 @@ Convert FLUX.1-dev weights from diffusers format → candle format.
 Handles key renames + QKV tensor merges (q+k+v → qkv).
 """
 
+import argparse
 import re
 import torch
 from safetensors import safe_open
@@ -16,6 +17,37 @@ SHARDS = [f"{SNAP}/diffusion_pytorch_model-0000{i}-of-00003.safetensors"
           for i in range(1, 4)]
 
 OUT = "/home/nobus/SSD/SSD_migration/Workbench/GPULOAD/models/flux_candle.safetensors"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dtype",
+        choices=["keep", "bf16", "f16", "f32"],
+        default="keep",
+        help="Output dtype for floating tensors. Default keeps the source dtype.",
+    )
+    parser.add_argument(
+        "--out",
+        default=OUT,
+        help="Output safetensors path.",
+    )
+    return parser.parse_args()
+
+
+ARGS = parse_args()
+
+
+def cast_tensor(t: torch.Tensor) -> torch.Tensor:
+    if not t.is_floating_point() or ARGS.dtype == "keep":
+        return t
+
+    dtype_map = {
+        "bf16": torch.bfloat16,
+        "f16": torch.float16,
+        "f32": torch.float32,
+    }
+    return t.to(dtype_map[ARGS.dtype])
 
 # ---------------------------------------------------------------------------
 # Simple key renames (no tensor shape change)
@@ -110,7 +142,7 @@ skipped: list[str] = []
 for src_key, t in tensors.items():
     # 1. Simple top-level renames
     if src_key in SIMPLE:
-        out[SIMPLE[src_key]] = t
+        out[SIMPLE[src_key]] = cast_tensor(t)
         continue
 
     # 2. Double blocks — per-block renames
@@ -126,7 +158,7 @@ for src_key, t in tensors.items():
             continue
         dst = remap_double(i, suffix)
         if dst:
-            out[dst] = t
+            out[dst] = cast_tensor(t)
         else:
             print(f"  UNMAPPED double: {src_key}")
         continue
@@ -143,7 +175,7 @@ for src_key, t in tensors.items():
             continue
         dst = remap_single(i, suffix)
         if dst:
-            out[dst] = t
+            out[dst] = cast_tensor(t)
         else:
             print(f"  UNMAPPED single: {src_key}")
         continue
@@ -185,6 +217,11 @@ for i in range(num_double):
         tensors[f"{p}.attn.add_v_proj.bias"],
     ], dim=0)
 
+    out[f"{c}.img_attn.qkv.weight"] = cast_tensor(out[f"{c}.img_attn.qkv.weight"])
+    out[f"{c}.img_attn.qkv.bias"] = cast_tensor(out[f"{c}.img_attn.qkv.bias"])
+    out[f"{c}.txt_attn.qkv.weight"] = cast_tensor(out[f"{c}.txt_attn.qkv.weight"])
+    out[f"{c}.txt_attn.qkv.bias"] = cast_tensor(out[f"{c}.txt_attn.qkv.bias"])
+
 # Single blocks: Q+K+V+proj_mlp → linear1
 for i in range(num_single):
     p = f"single_transformer_blocks.{i}"
@@ -202,13 +239,16 @@ for i in range(num_single):
         tensors[f"{p}.proj_mlp.bias"],
     ], dim=0)
 
+    out[f"{c}.linear1.weight"] = cast_tensor(out[f"{c}.linear1.weight"])
+    out[f"{c}.linear1.bias"] = cast_tensor(out[f"{c}.linear1.bias"])
+
 print(f"Output: {len(out)} tensors (from {len(tensors)} source, {len(skipped)} merged away)")
 
 # ---------------------------------------------------------------------------
 # Save
 # ---------------------------------------------------------------------------
 import os
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
-print(f"Saving to {OUT} ...")
-save_file(out, OUT)
+os.makedirs(os.path.dirname(ARGS.out), exist_ok=True)
+print(f"Saving to {ARGS.out} ...")
+save_file(out, ARGS.out)
 print("Done!")
