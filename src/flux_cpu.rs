@@ -2,6 +2,8 @@
 // Purpose: isolate whether purple output is caused by GPU/BF16/streaming.
 // If this gives clean output, the bug is in the GPU path.
 
+mod flux_blocks;
+
 use anyhow::Result;
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::{self as nn, LayerNorm, Module, VarBuilder};
@@ -101,8 +103,8 @@ fn main() -> Result<()> {
         let t_batch = Tensor::new(&[t], &cpu)?.to_dtype(dtype)?;
         let g_batch = Tensor::new(&[guidance_val], &cpu)?.to_dtype(dtype)?;
 
-        let t_emb = flux::model::timestep_embedding(&t_batch, 256, dtype)?;
-        let g_emb = flux::model::timestep_embedding(&g_batch, 256, dtype)?;
+        let t_emb = flux_blocks::timestep_embedding(&t_batch, 256, dtype)?;
+        let g_emb = flux_blocks::timestep_embedding(&g_batch, 256, dtype)?;
 
         let t_vec = nn::ops::silu(&ti_l1.forward(&t_emb)?)?.apply(&ti_l2)?;
         let g_vec = nn::ops::silu(&gi_l1.forward(&g_emb)?)?.apply(&gi_l2)?;
@@ -119,7 +121,7 @@ fn main() -> Result<()> {
         for i in 0..cfg.depth {
             print!("  double {}/{}\r", i + 1, cfg.depth);
             let _ = std::io::Write::flush(&mut std::io::stdout());
-            let block = flux::model::DoubleStreamBlock::new(&cfg, vb.pp(format!("double_blocks.{}", i)))?;
+            let block = flux_blocks::DoubleStreamBlock::new(&cfg, vb.pp(format!("double_blocks.{}", i)))?;
             let (new_img, new_txt) = block.forward(&img, &txt, &vec_, &pe)?;
             img = new_img;
             txt = new_txt;
@@ -131,7 +133,7 @@ fn main() -> Result<()> {
         for i in 0..cfg.depth_single_blocks {
             print!("  single {}/{}\r", i + 1, cfg.depth_single_blocks);
             let _ = std::io::Write::flush(&mut std::io::stdout());
-            let block = flux::model::SingleStreamBlock::new(&cfg, vb.pp(format!("single_blocks.{}", i)))?;
+            let block = flux_blocks::SingleStreamBlock::new(&cfg, vb.pp(format!("single_blocks.{}", i)))?;
             merged = block.forward(&merged, &vec_, &pe)?;
         }
         println!("  single {0}/{0} done", cfg.depth_single_blocks);

@@ -2,6 +2,7 @@
 // Loads all weights to CPU RAM, streams one block at a time to GPU.
 // Peak VRAM: ~4GB regardless of model size.
 
+mod flux_blocks;
 mod lora;
 use anyhow::Result;
 use candle_core::{DType, Device, IndexOp, Tensor};
@@ -296,8 +297,8 @@ fn main() -> Result<()> {
         let t_batch = Tensor::new(&[t], &gpu)?.to_dtype(dtype)?;
         let g_batch = Tensor::new(&[guidance_val], &gpu)?.to_dtype(dtype)?;
 
-        let t_emb = flux::model::timestep_embedding(&t_batch, 256, dtype)?;
-        let g_emb = flux::model::timestep_embedding(&g_batch, 256, dtype)?;
+        let t_emb = flux_blocks::timestep_embedding(&t_batch, 256, dtype)?;
+        let g_emb = flux_blocks::timestep_embedding(&g_batch, 256, dtype)?;
 
         // MLP: silu(l1(x)) → l2
         let t_vec = nn::ops::silu(&ti_l1.forward(&t_emb)?)?.apply(&ti_l2)?;
@@ -317,7 +318,7 @@ fn main() -> Result<()> {
             print_bar(step + 1, steps, i, total_blocks, t0_step.elapsed().as_secs_f32(), false);
             let cpu_map = pfx_rx.recv()??;
             let vb = cpu_to_gpu_vb(cpu_map, &gpu, dtype)?;
-            let block = flux::model::DoubleStreamBlock::new(&cfg, vb)?;
+            let block = flux_blocks::DoubleStreamBlock::new(&cfg, vb)?;
             let (new_img, new_txt) = block.forward(&img, &txt, &vec_, &pe)?;
             img = new_img;
             txt = new_txt;
@@ -333,7 +334,7 @@ fn main() -> Result<()> {
                 l.apply_gpu_deltas(&mut gpu_map, i);
             }
             let vb = VarBuilder::from_tensors(gpu_map, dtype, &gpu);
-            let block = flux::model::SingleStreamBlock::new(&cfg, vb)?;
+            let block = flux_blocks::SingleStreamBlock::new(&cfg, vb)?;
             merged = block.forward(&merged, &vec_, &pe)?;
         }
 

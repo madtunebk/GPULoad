@@ -2,24 +2,25 @@
 name = "sd-minimal"
 version = "0.1.0"
 edition = "2021"
+autobins = false
 
 [dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-core" }
-candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-nn" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", rev = "d23664fb4f50e709f2544fbed99d071a18a963eb", package = "candle-transformers" }
+candle-core =  { version = "=0.10.1" }
+candle-nn = { version = "=0.10.1" }
+candle-transformers = { version = "=0.10.1" }
 
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 
-tokenizers = "0.21"
-safetensors = "0.3"
-memmap2 = "0.9"
+tokenizers = "0.22.1"
+safetensors = "0.7.0"
+memmap2 = "0.9.10"
 num_cpus = "1.16"
-rayon = "1"
+rayon = "1.12.0"
 image = { version = "0.25", default-features = false, features = ["png"] }
-anyhow = "1.0"
+anyhow = "1.0.102"
 
 serde = { version = "1", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1.0.149"
 
 [[bin]]
 name = "flux_gpu"
