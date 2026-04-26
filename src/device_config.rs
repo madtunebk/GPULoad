@@ -64,11 +64,13 @@ pub fn auto_cuda_dtype(gpu_index: usize) -> Result<DType> {
         );
     }
 
+    // SM8+ (Ampere+): BF16 tensor cores, matches training dtype.
+    // SM<8 (T4, P100, …): cuBLAS BF16 GEMM is not supported; F16 overflows
+    // in deep transformer chains → NaN. F32 is the only stable option.
     let capability = query_compute_capability(gpu_index)?;
     let dtype = match capability {
-        Some((major, _minor)) if major >= 8 => DType::BF16,
-        Some((_major, _minor)) => DType::F16,
-        None => DType::F16,
+        Some((major, _)) if major >= 8 => DType::BF16,
+        _ => DType::F32,
     };
     Ok(dtype)
 }

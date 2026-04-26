@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 autobins = false
 
+[lib]
+name = "sd_minimal"
+path = "src/lib.rs"
+
 [dependencies]
 candle-core =  { version = "=0.10.1" }
 candle-nn = { version = "=0.10.1" }
@@ -24,19 +28,20 @@ serde_json = "1.0.149"
 
 [[bin]]
 name = "flux_gpu"
-path = "src/flux_stream.rs"
-
-[[bin]]
-name = "flux_cpu"
-path = "src/flux_cpu.rs"
+path = "src/bins/flux_gpu.rs"
 
 [[bin]]
 name = "vae_decode"
-path = "src/vae_decode.rs"
+path = "src/bins/vae_decode.rs"
 
 [[bin]]
 name = "text_encoder"
-path = "src/text_encoder.rs"
+path = "src/bins/text_encoder.rs"
+
+[[bin]]
+name = "generate"
+path = "src/generate.rs"
+
 
 [features]
 cuda  = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]

@@ -1,8 +1,0 @@
-target/
-dist/
-models/
-temp/
-.venv/
-.git/
-*.safetensors
-*.png
